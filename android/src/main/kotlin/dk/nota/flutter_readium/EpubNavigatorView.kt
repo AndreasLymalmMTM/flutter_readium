@@ -34,8 +34,11 @@ private const val TAG = "EpubNavigatorView"
 @SuppressLint("ViewConstructor")
 @OptIn(ExperimentalReadiumApi::class)
 internal class EpubNavigatorView(
-  context: Context, publication: Publication, initialLocator: Locator?,
-  userPropertiesPath: String, private val listener: Listener,
+  context: Context,
+  publication: Publication,
+  initialLocator: Locator?,
+  initialPreferences: EpubPreferences?,
+  private val listener: Listener,
   attrs: AttributeSet? = null
 ) : LinearLayout(context, attrs), EpubNavigatorFragment.Listener,
   EpubNavigatorFragment.PaginationListener {
@@ -78,6 +81,7 @@ internal class EpubNavigatorView(
 
     // DFG: This will be relative to your app's src/main/assets/ folder
     // Underneath Readium is using https://developer.android.com/reference/androidx/webkit/WebViewAssetLoader.AssetsPathHandler
+    val preferences = initialPreferences ?: EpubPreferences()
     val navigatorFactory = EpubNavigatorFactory(publication)
     val fragmentFactory = navigatorFactory.createFragmentFactory(
       configuration = EpubNavigatorFragment.Configuration(
@@ -91,15 +95,11 @@ internal class EpubNavigatorView(
       ),
       initialLocator = initialLocator,
       listener = this,
-      paginationListener = this
-      // initialPreferences = EpubPreferences(
-      //   theme = Theme.SEPIA,
-      //   scroll = false,
-      //   backgroundColor = ReadiumColor(Color.CYAN)
-      // )
+      paginationListener = this,
+      initialPreferences = preferences,
     )
 
-    editor = navigatorFactory.createPreferencesEditor(startPrefs)
+    editor = navigatorFactory.createPreferencesEditor(preferences)
 
     fragment = fragmentFactory.instantiate(
         activity.classLoader,
@@ -235,16 +235,10 @@ internal class EpubNavigatorView(
     Log.w(TAG, "onExternalLinkActivated: $url -- BUT NOT IMPLEMENTED!")
   }
 
-  fun setPreferencesFromUserProperties(userProperties: Map<String, String>) {
+  fun setPreferencesFromMap(userProperties: Map<String, String>) {
     try {
-      val newPreferences = EpubPreferences(
-        fontFamily = userProperties["fontFamily"]?.let { FontFamily(it) } ?: editor.preferences.fontFamily,
-        fontSize = userProperties["fontSize"]?.toDouble() ?: editor.preferences.fontSize,
-        fontWeight = userProperties["fontWeight"]?.toDouble() ?: editor.preferences.fontWeight,
-        scroll = userProperties["verticalScroll"]?.toBoolean() ?: editor.preferences.scroll,
-        backgroundColor = userProperties["backgroundColor"]?.let { ReadiumColorFromCSS(it) } ?: editor.preferences.backgroundColor,
-        textColor = userProperties["textColor"]?.let { ReadiumColorFromCSS(it) } ?: editor.preferences.textColor
-      )
+      val newPreferences = EpubPreferencesFromMap(userProperties, this.editor.preferences)
+        ?: throw IllegalArgumentException("failed to deserialize map into EpubPreferences")
       this.editor.apply {
         fontFamily.set(newPreferences.fontFamily)
         fontSize.set(newPreferences.fontSize)
@@ -255,9 +249,8 @@ internal class EpubNavigatorView(
       }
       this.fragment.submitPreferences(editor.preferences)
     } catch (ex: Exception) {
-      Log.e(TAG, "Error applying UserProperties as EpubPreferences: $ex")
+      Log.e(TAG, "Error applying EpubPreferences: $ex")
     }
-
   }
 }
 
