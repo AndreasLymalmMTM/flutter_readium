@@ -34,6 +34,7 @@ abstract class ReadiumState with _$ReadiumState {
 
     /// True if the publication is currently being opened.
     @Default(false) final bool opening,
+    final String? publicationURL,
     final Publication? publication,
     final OPDSPublication? opdsPublication,
     final Map<String, String>? httpHeaders,

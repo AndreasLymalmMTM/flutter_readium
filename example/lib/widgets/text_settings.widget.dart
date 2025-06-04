@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_readium/utils/runtime_platform.dart';
 
 import '../extensions/text_settings_theme.dart';
 import '../state/text_settings_bloc.dart';
@@ -76,6 +77,15 @@ class TextSettingsWidget extends StatelessWidget {
               ],
             ),
           ),
+          if (RuntimePlatform.isWeb) const Divider(),
+          if (RuntimePlatform.isWeb)
+            SizedBox(
+              width: double.infinity,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.close),
+              ),
+            ),
         ],
       ),
     );

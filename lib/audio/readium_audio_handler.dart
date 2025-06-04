@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_session/audio_session.dart';
 
@@ -73,10 +72,10 @@ abstract class ReadiumAudioHandler extends BaseAudioHandler {
     R2Log.d('Pause playback');
 
     // Fix to ensure that play/pause button works on iOS when external audio output is connected.
-    if (Platform.isIOS && !FlutterReadium.state.playing) {
+    if (RuntimePlatform.isIOS && !FlutterReadium.state.playing) {
       final isExternalOutput = await _isExternalAudioOutputConnected();
       // Playing state is checked twice, because state would sometimes change while awaiting _isExternalAudioOutputConnected.
-      // Which results in tts repeating the first paragraph. 
+      // Which results in tts repeating the first paragraph.
       if (isExternalOutput && !FlutterReadium.state.playing) {
         FlutterReadium.updateState(
           playing: true,

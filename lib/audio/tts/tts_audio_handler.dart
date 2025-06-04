@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' hide Link;
 import 'dart:math';
 
 import 'package:flutter_tts/flutter_tts.dart';
@@ -55,7 +54,7 @@ class TtsAudioHandler extends ReadiumAudioHandler {
     }
 
     _tts = FlutterTts();
-    if (Platform.isIOS) {
+    if (RuntimePlatform.isIOS) {
       await _tts?.setSharedInstance(true);
       await _tts?.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
         IosTextToSpeechAudioCategoryOptions.allowBluetooth,
@@ -648,7 +647,7 @@ class TtsAudioHandler extends ReadiumAudioHandler {
       return;
     }
 
-    final isIOS = Platform.isIOS;
+    final isIOS = RuntimePlatform.isIOS;
 
     playbackState.value = state.copyWith(
       // TODO: look into why on ios the skipToPrevious and skipToNext are for paragraphs while on android they are for chapters.

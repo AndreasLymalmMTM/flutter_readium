@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_readium/utils/runtime_platform.dart';
 import 'package:flutter_readium/flutter_readium.dart';
 
 import '../state/tts_settings_bloc.dart';
@@ -13,7 +12,7 @@ class TtsSettingsWidget extends StatefulWidget {
   final List<String> pubLang;
 
   @override
-  _TtsSettingsWidgetState createState() => _TtsSettingsWidgetState();
+  State<TtsSettingsWidget> createState() => _TtsSettingsWidgetState();
 }
 
 class _TtsSettingsWidgetState extends State<TtsSettingsWidget> {
@@ -127,6 +126,15 @@ class _TtsSettingsWidgetState extends State<TtsSettingsWidget> {
                 ],
               ),
             ),
+            if (RuntimePlatform.isWeb) const Divider(),
+            if (RuntimePlatform.isWeb)
+              SizedBox(
+                width: double.infinity,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close),
+                ),
+              ),
           ],
         ),
       );
@@ -200,7 +208,7 @@ class _TtsSettingsWidgetState extends State<TtsSettingsWidget> {
                   .map(
                     (final voice) => DropdownMenuItem<ReadiumTtsVoice>(
                       value: voice,
-                      child: Platform.isAndroid
+                      child: RuntimePlatform.isAndroid
                           ? Text(_getAndroidTtsVoiceName(voice))
                           : Text(voice.name),
                     ),

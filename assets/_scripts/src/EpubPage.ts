@@ -98,7 +98,8 @@ export class EpubPage {
   }
 
   // Checks whether a given locator is (at least partially) visible.
-  public isLocatorVisible(locator: Locator): boolean {
+  // Optionally checks whether the locator is active (contains the `active` class).
+  public isLocatorVisible(locator: Locator, checkIsActive = false): boolean {
     this._debugLog(locator);
 
     try {
@@ -118,7 +119,12 @@ export class EpubPage {
         return false;
       }
       // Checks also that the locator also contains `active` class.
-      return this._isProcessedRangeVisible(range) && !!document.querySelector(`${selector} #${this._activeLocationId}`);
+      const rangeIsVisible = this._isProcessedRangeVisible(range);
+      if (checkIsActive) {
+        return rangeIsVisible && !!document.querySelector(`${selector} #${this._activeLocationId}`);
+      } else {
+        return rangeIsVisible;
+      }
     } catch (error) {
       this._errorLog(error);
 

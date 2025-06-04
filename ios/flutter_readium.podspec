@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   # s.source           = { :path => '.' }
   s.source_files = 'Classes/**/*'
   s.dependency 'Flutter'
-  s.dependency 'PromiseKit'
+  s.dependency 'PromiseKit', '~> 8.1'
   s.dependency 'ReadiumShared', '~> 3.2.0'
   s.dependency 'ReadiumStreamer', '~> 3.2.0'
   s.dependency 'ReadiumNavigator', '~> 3.2.0'

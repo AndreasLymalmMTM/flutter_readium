@@ -74,6 +74,8 @@ class PublicationUtils {
             } on Object catch (e) {
               R2Log.w('Error reading metadata: $e');
             }
+            // Set some default metadata for books we couldn't parse it from.
+            // defaults to regarding it as a plain ebook.
             metaData ??= Metadata(
               title: {'und': basename},
               identifier: basename.split('.').first,
@@ -84,6 +86,13 @@ class PublicationUtils {
                 }),
               ],
               xIsAudiobook: false,
+              xIsEbook: true,
+              xHasText: true,
+            );
+
+            metaData = metaData.copyWith(
+              identifier: basename,
+              xIsEbook: true,
               xHasText: true,
             );
 
@@ -142,22 +151,21 @@ class PublicationUtils {
 
     // look for metadata and manifest files
     final metadataFile = await _locateFile(Directory(destinationDir), 'metadata.xml');
+    final epubMetadataFile = await _locateFile(Directory(destinationDir), 'content.opf');
     final package = await _locateFile(Directory(destinationDir), 'package.opf');
     final manifestFile = await _locateFile(Directory(destinationDir), 'manifest.json');
 
-    // Pubs from nota don't have the metadata.xml file
-    // Maybe we should consider only supporting manifest.json?
     if (metadataFile != null) {
       return _metadataFromXml(metadataFile);
-      // _metadataFromXml(metadataFile); have not been tested with a metadata.xml file as I don't have one
-      // it is entirely possible that it does not have "metadata" element which the function expects
+    } else if (epubMetadataFile != null) {
+      return _metadataFromXml(epubMetadataFile);
     } else if (package != null) {
       return _metadataFromXml(package);
     } else if (manifestFile != null) {
       return _metadataFromJson(manifestFile);
     } else {
       throw ReadiumError(
-        'package.opf, metadata.xml, and manifest.json are all missing, invalid file.',
+        'package.opf, metadata.xml, OEBPS/content.opf and manifest.json are all missing, invalid file.',
       );
     }
   }
@@ -241,6 +249,7 @@ class PublicationUtils {
     final xmlString = await metadataFile.readAsString();
     final document = xml.XmlDocument.parse(xmlString);
     final metadata = document.findAllElements('metadata').first;
+    final manifest = document.findAllElements('manifest').firstOrNull;
 
     try {
       final titleElement = metadata.findElements('title').isNotEmpty
@@ -272,8 +281,13 @@ class PublicationUtils {
       R2Log.e('Error reading identifier: $e');
     }
 
-    hasAudio = await _hasMimeTypeEpub(metadata, 'audio');
-    hasText = await _hasMimeTypeEpub(metadata, 'text');
+    if (manifest != null) {
+      hasAudio = await _hasMimeTypeEpub(manifest, 'audio');
+      hasText = await _hasMimeTypeEpub(manifest, 'text');
+    } else {
+      hasAudio = await _hasMimeTypeEpub(metadata, 'audio');
+      hasText = await _hasMimeTypeEpub(metadata, 'text');
+    }
 
     try {
       final languageElement = metadata.findElements('language').isNotEmpty

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
@@ -414,14 +413,6 @@ class Mp3AudioHandler extends ReadiumAudioHandler {
       return;
     }
 
-    _broadcastState(
-      playbackState.value.copyWith(
-        playing: true,
-        errorCode: null,
-        errorMessage: null,
-      ),
-    );
-
     // Make sure playback rate is set before play.
     setSpeed(FlutterReadium.state.playbackRate);
 
@@ -431,14 +422,24 @@ class Mp3AudioHandler extends ReadiumAudioHandler {
     // stops.
     _player.play();
 
+    _broadcastState(
+      playbackState.value.copyWith(
+        playing: true,
+        errorCode: null,
+        errorMessage: null,
+      ),
+    );
+
     super.play();
   }
 
   @override
   Future<void> pause() async {
     R2Log.d('pause');
-    _broadcastState(playbackState.value.copyWith(playing: false));
+
     _player.pause();
+
+    _broadcastState(playbackState.value.copyWith(playing: false));
 
     super.pause();
   }
@@ -1057,7 +1058,7 @@ class Mp3AudioHandler extends ReadiumAudioHandler {
 
         // NOTE: We need to add `skipToPrevious` and `skipToNext` in order to make the headset
         // buttons works on iOS.
-        if (Platform.isIOS) ...[
+        if (RuntimePlatform.isIOS) ...[
           MediaControl.skipToPrevious,
           MediaControl.skipToNext,
         ],

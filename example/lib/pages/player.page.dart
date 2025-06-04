@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../state/index.dart';
 import '../widgets/index.dart';
@@ -17,6 +18,13 @@ class _PlayerPageState extends State<PlayerPage> {
         builder: (final context, final pubState) => Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.deepPurple[200],
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                context.read<PublicationBloc>().add(ClosePublication());
+                Navigator.of(context).pop();
+              },
+            ),
             title: Semantics(
               header: true,
               child: Text(
@@ -53,8 +61,10 @@ class _PlayerPageState extends State<PlayerPage> {
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
-              builder: (final context) => TtsSettingsWidget(
-                pubLang: pubLang,
+              builder: (final context) => PointerInterceptor(
+                child: TtsSettingsWidget(
+                  pubLang: pubLang,
+                ),
               ),
             );
           },
@@ -66,10 +76,16 @@ class _PlayerPageState extends State<PlayerPage> {
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
-              builder: (final context) => const TextSettingsWidget(),
+              builder: (final context) => PointerInterceptor(child: const TextSettingsWidget()),
             );
           },
           tooltip: 'Open text style settings',
+        ),
+        // This is for debugging, change what happens on pressed to fit the debugging needs
+        // Default is to navigate to a locator that does not exist in the publication
+        IconButton(
+          icon: const Icon(Icons.bug_report),
+          onPressed: () => PublicationBloc().add(NavigateTo()),
         ),
       ];
 

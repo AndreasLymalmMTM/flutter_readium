@@ -51,7 +51,7 @@ PODS:
   - Flutter (1.0.0)
   - flutter_readium (0.0.1):
     - Flutter
-    - PromiseKit
+    - PromiseKit (~> 8.1)
     - ReadiumAdapterGCDWebServer (~> 3.2.0)
     - ReadiumNavigator (~> 3.2.0)
     - ReadiumOPDS (~> 3.2.0)
@@ -70,6 +70,8 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - pointer_interceptor_ios (0.0.1):
+    - Flutter
   - PromiseKit (8.2.0):
     - PromiseKit/CorePromise (= 8.2.0)
     - PromiseKit/Foundation (= 8.2.0)
@@ -133,6 +135,7 @@ DEPENDENCIES:
   - native_device_orientation (from `.symlinks/plugins/native_device_orientation/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - pointer_interceptor_ios (from `.symlinks/plugins/pointer_interceptor_ios/ios`)
   - PromiseKit (~> 8.1)
   - ReadiumAdapterGCDWebServer (from `https://raw.githubusercontent.com/readium/swift-toolkit/3.2.0/Support/CocoaPods/ReadiumAdapterGCDWebServer.podspec`)
   - ReadiumInternal (from `https://raw.githubusercontent.com/readium/swift-toolkit/3.2.0/Support/CocoaPods/ReadiumInternal.podspec`)
@@ -183,6 +186,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/package_info_plus/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  pointer_interceptor_ios:
+    :path: ".symlinks/plugins/pointer_interceptor_ios/ios"
   ReadiumAdapterGCDWebServer:
     :podspec: https://raw.githubusercontent.com/readium/swift-toolkit/3.2.0/Support/CocoaPods/ReadiumAdapterGCDWebServer.podspec
   ReadiumInternal:
@@ -213,13 +218,14 @@ SPEC CHECKSUMS:
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
-  flutter_readium: 69a75f2d537a9c89813169e7e5935558eede964e
+  flutter_readium: 548624950416972711171fe1146361723d4abd49
   flutter_tts: b88dbc8655d3dc961bc4a796e4e16a4cc1795833
   just_audio: 4e391f57b79cad2b0674030a00453ca5ce817eed
   Minizip: 188cb3e39a1195c283ae03bf673d182596fefd0b
   native_device_orientation: e3580675687d5034770da198f6839ebf2122ef94
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
+  pointer_interceptor_ios: ec847ef8b0915778bed2b2cef636f4d177fa8eed
   PromiseKit: 74e6ab5894856b4762fef547055c809bca91d440
   ReadiumAdapterGCDWebServer: e1b3e05c2c823b935323e08bfed96b0b71cea785
   ReadiumFuzi: 888d023b862f524e314f85925c94768a501f05c0

@@ -229,11 +229,12 @@ internal class ReadiumReaderView(
           result.success(null)
         }
         "isLocatorVisible" -> {
-          val args = call.arguments as String
-          val locatorJson = JSONObject(args)
+          val args = call.arguments as List<*>
+          val locatorJson = JSONObject(args[0] as String)
+          val checkIsActive = args[1] as? Boolean ?: false
           val locator = Locator.fromJSON(locatorJson)!!
           val visible = locator.href == readiumView.currentLocator.href && jsonDecode(
-            readiumView.evaluateJavascript("window.epubPage.isLocatorVisible($args);") ?: "false"
+            readiumView.evaluateJavascript("window.epubPage.isLocatorVisible($args, $checkIsActive);") ?: "false"
           ) as Boolean
           result.success(visible)
         }

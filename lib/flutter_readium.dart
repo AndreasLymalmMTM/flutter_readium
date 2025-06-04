@@ -94,7 +94,7 @@ class FlutterReadium {
           fastForwardInterval: skipDuration,
         ),
       ),
-      if (!kIsWeb)
+      if (!RuntimePlatform.isWeb)
         ReadiumDownloader.instance.init(
           step: downloadStep,
           debug: downloadDebug,
@@ -102,7 +102,8 @@ class FlutterReadium {
         ),
     ]);
 
-    if (!kReleaseMode && !kIsWeb) await ReadiumPublicationChannel.dispose();
+    // TODO: find out if it's needed for web.
+    if (!kReleaseMode && !RuntimePlatform.isWeb) await ReadiumPublicationChannel.dispose();
   }
 
   /// Opens a publication. Closes an old publication, if one is open.
@@ -461,7 +462,7 @@ class FlutterReadium {
       throw const OfflineReadiumException();
     }
 
-    if (preload) {
+    if (preload && !RuntimePlatform.isWeb) {
       FlutterReadium.updateState(
         preloadStatus: ReadiumPreloadStatus.loading,
       );
@@ -525,6 +526,12 @@ class FlutterReadium {
 
     final url = link.href;
     final publicationUrl = url.substring(0, url.lastIndexOf('/') + 1);
+
+    if (RuntimePlatform.isWeb) {
+      FlutterReadium.updateState(
+        publicationURL: url,
+      );
+    }
 
     return ReadiumPublicationChannel.fromLink(
       url,

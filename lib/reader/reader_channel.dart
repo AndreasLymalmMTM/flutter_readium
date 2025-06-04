@@ -36,7 +36,7 @@ class ReadiumReaderChannel extends MethodChannel {
 
   /// Only does anything on Android.
   static Future<void> writeUserPropertiesFile(final ReadiumReaderProperties userProperties) async {
-    if (Platform.isAndroid) {
+    if (RuntimePlatform.isAndroid) {
       if (userPropertiesPath == null) {
         final directory = await getApplicationSupportDirectory();
         userPropertiesPath = join(directory.path, 'UserProperties.json');
@@ -135,9 +135,10 @@ class ReadiumReaderChannel extends MethodChannel {
         },
       );
 
-  Future<bool> isLocatorVisible(final Locator locator) => _invokeMethod<bool>(
+  Future<bool> isLocatorVisible(final Locator locator, final bool checkIsActive) =>
+      _invokeMethod<bool>(
         _ReaderChannelMethodInvoke.isLocatorVisible,
-        json.encode(locator),
+        [json.encode(locator), checkIsActive],
       ).then((final isVisible) => isVisible!).onError((final error, final _) => true);
 
   Future<void> dispose() async {

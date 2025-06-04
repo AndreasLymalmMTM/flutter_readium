@@ -31,6 +31,7 @@ class PlayerControlsState {
   PlayerControlsState togglePlay(final bool playing) {
     final newState = PlayerControlsState(playing: playing, ttsEnabled: ttsEnabled);
 
+    // ignore: unused_result
     FlutterReadium.updateState(
       playing: newState.playing,
     );

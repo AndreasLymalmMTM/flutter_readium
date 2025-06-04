@@ -21,31 +21,38 @@ extension TtsVoiceExtension on TtsAudioHandler {
 
     await _ensureGoogleTtsEngine();
 
-    final ttsVoices = await _tts?.getVoices;
+    // Rewritten due to an issue on web
+    // on web the first attempt will always fail, and it does not help to have a delay first
+    // usually only the first attempt fails, but giving it a few more attempts for safety
+    for (var attempt = 1; attempt <= 5; attempt++) {
+      final ttsVoices = await _tts?.getVoices;
 
-    if (ttsVoices == null || ttsVoices is! Iterable || ttsVoices.isEmpty) {
-      throw const ReadiumException('No voices found on the device');
-    }
+      if (ttsVoices != null && ttsVoices is Iterable && ttsVoices.isNotEmpty) {
+        final voices = <ReadiumTtsVoice>[];
 
-    final voices = <ReadiumTtsVoice>[];
+        for (final voice in ttsVoices) {
+          final voiceLocaleRaw = voice['locale'];
+          final name = voice['name'];
 
-    for (final voice in ttsVoices) {
-      final voiceLocaleRaw = voice['locale'];
-      final name = voice['name'];
+          if (voiceLocaleRaw is! String || name is! String) {
+            continue;
+          }
 
-      if (voiceLocaleRaw is! String || name is! String) {
-        continue;
+          voices.add(
+            ReadiumTtsVoice(
+              locale: voiceLocaleRaw,
+              name: name,
+            ),
+          );
+        }
+
+        return _voices = voices;
       }
-
-      voices.add(
-        ReadiumTtsVoice(
-          locale: voiceLocaleRaw,
-          name: name,
-        ),
-      );
+      // Wait briefly before retrying
+      await Future.delayed(const Duration(milliseconds: 150));
     }
 
-    return _voices = voices;
+    throw const ReadiumException('No voices found on the device');
   }
 
   // This function sets the language of the TTS.
@@ -109,7 +116,7 @@ extension TtsVoiceExtension on TtsAudioHandler {
     final matchingVoice =
         currentVoices?.firstWhereOrNull((final voice) => voice.langCode == langCode);
 
-    if (Platform.isAndroid && matchingVoice == null) {
+    if (RuntimePlatform.isAndroid && matchingVoice == null) {
       final defaultVoice =
           defaultVoices.firstWhereOrNull((final voice) => voice.langCode == langCode);
       await setTtsVoice(defaultVoice ?? defaultVoices[0]);
@@ -121,7 +128,7 @@ extension TtsVoiceExtension on TtsAudioHandler {
   }
 
   Future<void> _ensureGoogleTtsEngine() async {
-    if (Platform.isAndroid) {
+    if (RuntimePlatform.isAndroid) {
       final defaultEngine = await _tts?.getDefaultEngine;
 
       // Currently we only support Google's TTS engine on Android devices.

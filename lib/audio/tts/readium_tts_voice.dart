@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui';
 
 import '../../_index.dart';
@@ -23,10 +22,10 @@ extension ReadiumTtsVoiceExtension on ReadiumTtsVoice {
   String get langCode => localeObj.languageCode;
 
   // Android voices have a different name format than what we receive, making it more readable
-  String? get androidVoiceName => Platform.isAndroid ? _androidTtsVoiceName(name) : null;
+  String? get androidVoiceName => RuntimePlatform.isAndroid ? _androidTtsVoiceName(name) : null;
 
   // Identifying bool for if the voice is local or network or not one of the standards.
-  bool? get androidIsLocal => Platform.isAndroid ? _androidIsLocal(name) : null;
+  bool? get androidIsLocal => RuntimePlatform.isAndroid ? _androidIsLocal(name) : null;
 
   // Funtion to map the voice name to the correct voice name for Android
   // These are only for the languages we know and might not be correct, as it is not always easy to hear which are the correct matches.

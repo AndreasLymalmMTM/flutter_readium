@@ -60,13 +60,23 @@ class ReaderWidget extends StatelessWidget {
                 ),
               ),
             );
-          } else if (state.publication != null) {
+          } else if (state.publication != null || RuntimePlatform.isWeb) {
             context.read<TextSettingsBloc>().add(OpenPubSuccess());
             return Semantics(
               container: true,
               explicitChildNodes: true,
-              child: const ExcludeSemantics(
-                child: ReadiumReaderWidget(),
+              child: ExcludeSemantics(
+                child: BlocSelector<TextSettingsBloc, TextSettingsState, Color>(
+                  selector: (state) {
+                    return state.theme.backgroundColor;
+                  },
+                  builder: (context, backgroundColor) {
+                    return Container(
+                      color: backgroundColor,
+                      child: ReadiumReaderWidget(),
+                    );
+                  },
+                ),
               ),
             );
           }

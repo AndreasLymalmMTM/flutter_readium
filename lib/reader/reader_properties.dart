@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:collection/collection.dart';
@@ -25,7 +24,7 @@ class ReadiumReaderProperties {
   final Color? highlightForegroundColor;
 
   Map<String, String> toJson() {
-    // if (Platform.isAndroid) {
+    // if (RuntimePlatform.isAndroid) {
     //   // TODO: Remove this when it is possible to set custom preferences readium toolkit.
     //   return {
     //     'backgroundColor': backgroundColor.toCSS(),

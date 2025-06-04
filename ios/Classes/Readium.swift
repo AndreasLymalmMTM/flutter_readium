@@ -23,13 +23,13 @@ let sharedReadium = Readium()
 final class Readium {
   lazy var httpClient: HTTPClient = DefaultHTTPClient()
   lazy var httpServer: HTTPServer = GCDHTTPServer(assetRetriever: assetRetriever)
-  
+
   lazy var formatSniffer: FormatSniffer = DefaultFormatSniffer()
-  
+
   lazy var assetRetriever = AssetRetriever(
     httpClient: httpClient
   )
-  
+
   lazy var publicationOpener = PublicationOpener(
     parser: DefaultPublicationParser(
       httpClient: httpClient,
@@ -37,19 +37,16 @@ final class Readium {
       pdfFactory: DefaultPDFDocumentFactory()
     ),
     contentProtections: contentProtections,
-    onCreatePublication: { manifest, container, services in
-      container = TransformingContainer(container: container, transformer: self.injectCSS)
-    }
   )
-  
+
 #if !LCP
   let contentProtections: [ContentProtection] = []
-  
+
 #else
   lazy var contentProtections: [ContentProtection] = [
     lcpService.contentProtection(with: lcpAuthentication),
   ]
-  
+
   lazy var lcpService = LCPService(
     client: LCPClient(),
     licenseRepository: try! LCPSQLiteLicenseRepository(),
@@ -57,60 +54,24 @@ final class Readium {
     assetRetriever: assetRetriever,
     httpClient: httpClient
   )
-  
+
   lazy var lcpAuthentication: LCPAuthenticating = LCPDialogAuthentication()
-  
+
   /// Facade to the private R2LCPClient.framework.
   class LCPClient: ReadiumLCP.LCPClient {
     func createContext(jsonLicense: String, hashedPassphrase: LCPPassphraseHash, pemCrl: String) throws -> LCPClientContext {
       try R2LCPClient.createContext(jsonLicense: jsonLicense, hashedPassphrase: hashedPassphrase, pemCrl: pemCrl)
     }
-    
+
     func decrypt(data: Data, using context: LCPClientContext) -> Data? {
       R2LCPClient.decrypt(data: data, using: context as! DRMContext)
     }
-    
+
     func findOneValidPassphrase(jsonLicense: String, hashedPassphrases: [LCPPassphraseHash]) -> LCPPassphraseHash? {
       R2LCPClient.findOneValidPassphrase(jsonLicense: jsonLicense, hashedPassphrases: hashedPassphrases)
     }
   }
 #endif
-  
-  
-  func injectCSS(_ anyUrl: AnyURL, _ resource: Resource) -> Resource {
-    let comicCssKey = SwiftR2NavigatorFlutterPlugin.registrar?.lookupKey(forAsset: "assets/helpers/comics.css", fromPackage: "flutter_readium")
-    let epubCssKey = SwiftR2NavigatorFlutterPlugin.registrar?.lookupKey(forAsset: "assets/helpers/epub.css", fromPackage: "flutter_readium")
-    
-    let sourceFiles = [comicCssKey, epubCssKey]
-    let source = sourceFiles.compactMap { sourceFile -> String? in
-      if let path = Bundle.main.path(forResource: sourceFile, ofType: nil),
-         let data = FileManager().contents(atPath: path),
-         let stringData = String(data: data, encoding: .utf8) {
-        return stringData
-      }
-      print("\(TAG)::injectCSS No source found on \(String(describing: sourceFile))")
-      
-      return nil
-    }.joined(separator: "\n")
-    
-    // We only transform HTML resources.
-    guard resource.sourceURL?.pathExtension?.rawValue.localizedCaseInsensitiveContains("html") == true else {
-      return resource
-    }
-    
-    return resource.mapAsString { content -> String in
-      var content = content
-      
-      if let headEnd = content.startIndex(of: "</head>") {
-        let style = "<style>\(source)</style>"
-        content = content.insert(string: style, at: headEnd)
-      } else {
-        print("\(TAG)::injectCSS No head found on the document")
-      }
-      
-      return content
-    }
-  }
 }
 
 extension ReadiumShared.ReadError: UserErrorConvertible {
@@ -279,20 +240,20 @@ extension LCPError: UserErrorConvertible {
       case let .licenseStatus(error):
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
-        
+
         switch error {
         case let .cancelled(date):
           return "lcp_error_status_cancelled".localized(dateFormatter.string(from: date))
         case let .returned(date):
           return "lcp_error_status_returned".localized(dateFormatter.string(from: date))
-          
+
         case let .expired(start: start, end: end):
           if start > Date() {
             return "lcp_error_status_expired_start".localized(dateFormatter.string(from: start))
           } else {
             return "lcp_error_status_expired_end".localized(dateFormatter.string(from: end))
           }
-          
+
         case let .revoked(date, devicesCount):
           return "lcp_error_status_revoked".localized(dateFormatter.string(from: date), devicesCount)
         }
@@ -325,15 +286,15 @@ private extension String {
   func endIndex(of string: String, options: CompareOptions = .literal) -> Index? {
     return range(of: string, options: options)?.upperBound
   }
-  
+
   func startIndex(of string: String, options: CompareOptions = .literal) -> Index? {
     return range(of: string, options: options)?.lowerBound
   }
-  
+
   func insert(string: String, at index: String.Index) -> String {
     let prefix = self[..<index] //substring(to: index)
     let suffix = self[index...] //substring(from: index)
-    
+
     return  prefix + string + suffix
   }
 }

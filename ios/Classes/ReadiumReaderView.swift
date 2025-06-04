@@ -9,19 +9,12 @@ private let TAG = "ReadiumReaderView"
 
 let readiumReaderViewType = "dk.nota.flutter_readium/ReadiumReaderWidget"
 
-private let scrollScripts = [
-  false: WKUserScript(
-    source: "setScrollMode(false);", injectionTime: .atDocumentEnd, forMainFrameOnly: false),
-  true: WKUserScript(
-    source: "setScrollMode(true);", injectionTime: .atDocumentEnd, forMainFrameOnly: false),
-]
-
 class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
 
   private let channel: ReadiumReaderChannel
   private let _view: UIView
   private let readiumViewController: EPUBNavigatorViewController
-  private let userScript: WKUserScript
+  private var userScripts: [WKUserScript] = []
   private var isVerticalScroll = false
   private var synthesizer: PublicationSpeechSynthesizer?
 
@@ -34,6 +27,8 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
     print(TAG, "::dispose")
     readiumViewController.view.removeFromSuperview()
     readiumViewController.delegate = nil
+    synthesizer?.delegate = nil;
+    synthesizer = nil;
     channel.setMethodCallHandler(nil)
   }
 
@@ -47,6 +42,7 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
     let creationParams = args as! Dictionary<String, Any?>
     let publication = publicationFromHandle()!
     let userProperties = creationParams["userProperties"] as! Dictionary<String, String>
+    let initialPreferences = EPUBPreferences(fromMap: userProperties)
     // If cast fails, locatorString is NSNull, and is converted to nil which makes more sense.
     let locatorString = creationParams["initialLocator"] as? String
     let locator = locatorString == nil ? nil : try! Locator.init(jsonString: locatorString!)
@@ -58,13 +54,11 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
     print(TAG, "publication: (title=\(String(describing: publication.metadata.title)), baseUrl=\(String(describing: publication.baseURL))")
     print(TAG, "Added publication at \(String(describing: publication.baseURL))")
 
-    // Remove undocumented Readium default 20dp or 44dp top/bottom padding.
-    // See EPUBNavigatorViewController.swift in r2-navigator-swift.
-    var config = EPUBNavigatorViewController.Configuration()
-    config.contentInset = [
+    // Set EPUBPreferences & remove undocumented Readium default 20dp or 44dp top/bottom padding.
+    var config = EPUBNavigatorViewController.Configuration(preferences: initialPreferences, contentInset: [
       .compact: (top: 0, bottom: 0),
       .regular: (top: 0, bottom: 0),
-    ]
+    ])
 
     // WORKAROUND:
     // To ensure that the custom CSS properties(fx. highlight) are set upon the creation of the webView.
@@ -81,26 +75,19 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
       publication: publication,
       initialLocation: locator,
       config: config,
-      httpServer: sharedReadium.httpServer
+      httpServer: sharedReadium.httpServer,
     )
-
-    let commicJsKey = registrar.lookupKey(forAsset: "assets/helpers/comics.js", fromPackage: "flutter_readium")
-    // Add epub.js script for highlighting and things like that.
-    let epubJsKey = registrar.lookupKey(forAsset: "assets/helpers/epub.js", fromPackage: "flutter_readium")
-    let sourceFiles = [commicJsKey, epubJsKey]
-    let source = sourceFiles.map { sourceFile -> String in
-      let path = Bundle.main.path(forResource: sourceFile, ofType: nil)!
-      let data = FileManager().contents(atPath: path)!
-      return String(data: data, encoding: .utf8)!
-    }.joined(separator: "\n")
-    userScript = WKUserScript(source: "const isAndroid=false,isIos=true;\n" + source, injectionTime: .atDocumentStart, forMainFrameOnly: false)
 
     _view = UIView()
     //_view.backgroundColor = UIColor(red: 1.0, green: 0.8, blue: 0.8, alpha: 1.0)
     super.init()
+    
+    // Initialize UserScripts for injecting our custom JS and CSS.
+    self.initializeUserScripts(registrar: registrar)
 
     channel.setMethodCallHandler(onMethodCall)
     readiumViewController.delegate = self
+    
 
     let child: UIView = readiumViewController.view  // Must specify type `UIView`, or we end up with an `UIView?` instead…
     let view = _view
@@ -109,15 +96,15 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
     child.frame = view.bounds
     print(TAG, "Fixed view bounds \(view.bounds)")
     view.addSubview(readiumViewController.view)
-
-    setUserProperties(userProperties: userProperties)
     print(TAG, "::init success")
   }
 
   // override EPUBNavigatorDelegate::navigator:setupUserScripts
   func navigator(_ navigator: EPUBNavigatorViewController, setupUserScripts userContentController: WKUserContentController) {
     print(TAG, "setupUserScripts:")
-    userContentController.addUserScript(userScript)
+    for script in userScripts {
+      userContentController.addUserScript(script)
+    }
   }
 
   // override EPUBNavigatorDelegate::middleTapHandler
@@ -164,10 +151,9 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
 
   private func setUserProperties(userProperties: Dictionary<String, String>) {
     print(TAG, "::setUserProperties")
-    let controller = readiumViewController
 
-    let preferences = mapToEPUBPreferences(userProperties)
-    controller.submitPreferences(preferences)
+    let preferences = EPUBPreferences(fromMap: userProperties)
+    self.readiumViewController.submitPreferences(preferences)
 
     // Set Custom css variables.
     let userPrefProperties = userProperties.filter { key, _ in key.hasPrefix("--") }
@@ -327,14 +313,11 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
       }
       break
     case "isLocatorVisible":
-      let args = call.arguments as! String
-      print(TAG, "onMethodCall[isLocatorVisible] locator = \(args)")
-      let locator = try! Locator(jsonString: args, warnings: readiumBugLogger)!
-      if locator.href != self.readiumViewController.currentLocation?.href {
-        result(false)
-        return
-      }
-      evaluateJSReturnResult("window.epubPage.isLocatorVisible(\(args));", result: result)
+      let args = call.arguments as! [Any]
+      let locatorJson = args[0] as! String
+      let checkIsActive = args[1] as! Bool
+      print(TAG, "onMethodCall[isLocatorVisible] locator = \(locatorJson), checkIsActive = \(checkIsActive)")
+      evaluateJSReturnResult("window.epubPage.isLocatorVisible(\(locatorJson), \(checkIsActive));", result: result)
       break
     case "ttsStart":
       self.onMethodTTSStart(call, result: result)
@@ -359,6 +342,7 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
       readiumViewController.delegate = nil
       synthesizer?.delegate = nil;
       synthesizer = nil;
+      channel.setMethodCallHandler(nil)
       result(nil)
       break
     default:
@@ -367,94 +351,39 @@ class ReadiumReaderView: NSObject, FlutterPlatformView, EPUBNavigatorDelegate {
       break
     }
   }
-
-  private func mapToEPUBPreferences(_ dictionary: Dictionary<String, String>) -> EPUBPreferences {
-    var preferences = EPUBPreferences()
-
-    for (key, value) in dictionary {
-      switch key {
-      case "backgroundColor":
-        preferences.backgroundColor = Color(hex: value)
-      case "columnCount":
-        if let columnCountValue = ColumnCount(rawValue: value) {
-          preferences.columnCount = columnCountValue
-        }
-      case "fontFamily":
-        preferences.fontFamily = FontFamily(rawValue: value)
-
-      case "fontSize":
-        if let fontSizeValue = Double(value) {
-          preferences.fontSize = fontSizeValue
-        }
-      case "fontWeight":
-        if let fontWeightValue = Double(value) {
-          preferences.fontWeight = fontWeightValue
-        }
-      case "hyphens":
-        preferences.hyphens = (value == "true")
-      case "imageFilter":
-        if let imageFilterValue = ImageFilter(rawValue: value) {
-          preferences.imageFilter = imageFilterValue
-        }
-      case "letterSpacing":
-        if let letterSpacingValue = Double(value) {
-          preferences.letterSpacing = letterSpacingValue
-        }
-      case "ligatures":
-        preferences.ligatures = (value == "true")
-      case "lineHeight":
-        if let lineHeightValue = Double(value) {
-          preferences.lineHeight = lineHeightValue
-        }
-      case "pageMargins":
-        if let pageMarginsValue = Double(value) {
-          preferences.pageMargins = pageMarginsValue
-        }
-      case "paragraphIndent":
-        if let paragraphIndentValue = Double(value) {
-          preferences.paragraphIndent = paragraphIndentValue
-        }
-      case "paragraphSpacing":
-        if let paragraphSpacingValue = Double(value) {
-          preferences.paragraphSpacing = paragraphSpacingValue
-        }
-      case "scroll":
-        preferences.scroll = (value == "true")
-      case "spread":
-        if let spreadValue = Spread(rawValue: value) {
-          preferences.spread = spreadValue
-        }
-      case "textAlign":
-        if let textAlignValue = TextAlignment(rawValue: value) {
-          preferences.textAlign = textAlignValue
-        }
-      case "textColor":
-        preferences.textColor = Color(hex: value)
-      case "textNormalization":
-        preferences.textNormalization = (value == "true")
-      case "theme":
-        if let themeValue = Theme(rawValue: value) {
-          preferences.theme = themeValue
-        }
-      case "typeScale":
-        if let typeScaleValue = Double(value) {
-          preferences.typeScale = typeScaleValue
-        }
-      case "verticalText":
-        preferences.verticalText = (value == "true")
-      case "wordSpacing":
-        if let wordSpacingValue = Double(value) {
-          preferences.wordSpacing = wordSpacingValue
-        }
-      case "--USER__highlightBackgroundColor", "--USER__highlightForegroundColor":
-        // Ignore custom properties
-        break
-      default:
-        print(TAG, "ERROR: Unsuported Property: \(key): \(value)")
-      }
+  
+  private func initializeUserScripts(registrar: FlutterPluginRegistrar) {
+    let commicJsKey = registrar.lookupKey(forAsset: "assets/helpers/comics.js", fromPackage: "flutter_readium")
+    let comicCssKey = registrar.lookupKey(forAsset: "assets/helpers/comics.css", fromPackage: "flutter_readium")
+    let epubJsKey = registrar.lookupKey(forAsset: "assets/helpers/epub.js", fromPackage: "flutter_readium")
+    let epubCssKey = registrar.lookupKey(forAsset: "assets/helpers/epub.css", fromPackage: "flutter_readium")
+    let jsScripts = [commicJsKey, epubJsKey].map { sourceFile -> String in
+      let path = Bundle.main.path(forResource: sourceFile, ofType: nil)!
+      let data = FileManager().contents(atPath: path)!
+      return String(data: data, encoding: .utf8)!
     }
-
-    return preferences
+    let addCssScripts = [comicCssKey, epubCssKey].map { sourceFile -> String in
+      let path = Bundle.main.path(forResource: sourceFile, ofType: nil)!
+      let data = FileManager().contents(atPath: path)!.base64EncodedString()
+      return """
+        (function() {
+        var parent = document.getElementsByTagName('head').item(0);
+        var style = document.createElement('style');
+        style.type = 'text/css';
+        style.innerHTML = window.atob('\(data)');
+        parent.appendChild(style)})();
+      """
+    }
+    /// Add JS scripts right away, before loading the rest of the document.
+    for jsScript in jsScripts {
+      userScripts.append(WKUserScript(source: jsScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+    }
+    /// Add css injection scripts after primary document finished loading.
+    for addCssScript in addCssScripts {
+      userScripts.append(WKUserScript(source: addCssScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false))
+    }
+    /// Add simple script used by our JS to detect OS
+    userScripts.append(WKUserScript(source: "const isAndroid=false,isIos=true;", injectionTime: .atDocumentStart, forMainFrameOnly: false))
   }
 }
 
@@ -465,20 +394,6 @@ class ReadiumBugLogger: ReadiumShared.WarningLogger {
 }
 
 private let readiumBugLogger = ReadiumBugLogger()
-
-private func tryType<T>(_ json: T?) throws -> Data? where T: Encodable {
-  return json != nil ? try JSONEncoder().encode(json) : nil
-}
-
-private func jsonEncode(_ json: Any?) -> String {
-  if json == nil {
-    return "null"
-  }
-  let data =
-  try! tryType(json as? Bool) ?? tryType(json as? Int) ?? tryType(json as? Double) ?? tryType(
-    json as? String) ?? JSONSerialization.data(withJSONObject: json!, options: [])
-  return String(data: data, encoding: .utf8)!
-}
 
 private func canScroll(locations: Locator.Locations?) -> Bool {
   guard let locations = locations else { return false }

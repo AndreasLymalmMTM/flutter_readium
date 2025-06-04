@@ -109,7 +109,7 @@ class ReadiumDownloader {
     final displayName = opdsPublication.displayName;
 
     // Only show download notifications on android.
-    if (Platform.isAndroid) {
+    if (RuntimePlatform.isAndroid) {
       _downloader.configureNotificationForTask(
         task,
         running: TaskNotification(displayName, ''),

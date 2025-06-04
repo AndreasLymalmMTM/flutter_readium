@@ -38,8 +38,8 @@ class ReadiumReaderWidget extends StatefulWidget {
 class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
     implements ReadiumReaderWidgetInterface {
   static const _wakelockTimerDuration = Duration(minutes: 30);
-  static const _maxRetryAwaitLocatorVisible = 20;
-  static const _maxRetryAwaitNativeViewReady = 10;
+  static const _maxRetryAwaitLocatorVisible = 100;
+  static const _maxRetryAwaitNativeViewReady = 20;
   Timer? _wakelockTimer;
   ReadiumReaderChannel? _channel;
 
@@ -197,10 +197,10 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
   }
 
   @override
-  Future<void> goLeft({final bool animated = true}) async => _channel?.goLeft();
+  Future<void> goLeft({final bool animated = true}) async => _channel?.goLeft(animated: animated);
 
   @override
-  Future<void> goRight({final bool animated = true}) async => _channel?.goRight();
+  Future<void> goRight({final bool animated = true}) async => _channel?.goRight(animated: animated);
 
   @override
   Future<Locator?> getLocatorFragments(final Locator locator) async {
@@ -215,7 +215,6 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
 
   Widget _buildNativeReader() => StreamBuilder<Publication?>(
         stream: FlutterReadium.stateStream.publication,
-        initialData: FlutterReadium.state.publication,
         builder: (final context, final publicationSnapshot) {
           final publication = publicationSnapshot.data;
 
@@ -223,73 +222,66 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
             return _loadingWidget;
           }
 
-          return AnimatedSwitcher(
+          return Builder(
             key: ValueKey(publication.identifier),
-            duration: const Duration(milliseconds: 400),
-            child: FutureBuilder(
-              key: ValueKey(publication.identifier),
-              future: ReadiumReaderChannel.writeUserPropertiesFile(
-                FlutterReadium.state.readerProperties,
-              ),
-              builder: (final context, final userPropertiesReadySnapshot) {
-                if (userPropertiesReadySnapshot.connectionState != ConnectionState.done) {
-                  return _loadingWidget;
-                }
+            builder: (final context) {
+              R2Log.d('_buildNativeReader ${publication.identifier}');
 
-                R2Log.d(publication.identifier);
+              final properties = FlutterReadium.state.readerProperties.toJson();
 
-                final properties = FlutterReadium.state.readerProperties.toJson();
+              final locator = FlutterReadium.state.currentLocator?.toTextLocator();
 
-                final locator = FlutterReadium.state.currentLocator?.toTextLocator();
+              var initialLocator = locator;
+              if (locator != null && locator.href.startsWith('/')) {
+                // leading slash makes swift toolkit jump to root of the publication.
+                initialLocator = locator.copyWith(href: locator.href.substring(1));
+              }
 
-                final creationParams = <String, dynamic>{
-                  'userProperties': properties,
-                  if (Platform.isAndroid)
-                    'userPropertiesPath': ReadiumReaderChannel.userPropertiesPath,
-                  'initialLocator': locator == null ? null : json.encode(locator),
-                };
+              final creationParams = <String, dynamic>{
+                'userProperties': properties,
+                'initialLocator': initialLocator == null ? null : json.encode(initialLocator),
+              };
 
-                R2Log.d('creationParams=$creationParams');
+              R2Log.d('creationParams=$creationParams');
 
-                if (Platform.isAndroid) {
-                  return PlatformViewLink(
-                    viewType: _viewType,
-                    surfaceFactory: (final context, final controller) => AndroidViewSurface(
-                      controller: controller as AndroidViewController,
-                      gestureRecognizers: const {},
-                      hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-                    ),
-                    onCreatePlatformView: (final params) =>
-                        PlatformViewsService.initSurfaceAndroidView(
-                      id: params.id,
-                      viewType: _viewType,
-                      layoutDirection: TextDirection.ltr,
-                      creationParams: creationParams,
-                      creationParamsCodec: const StandardMessageCodec(),
-                    )
-                          ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
-                          ..addOnPlatformViewCreatedListener(_onPlatformViewCreated)
-                          ..create(),
-                  );
-                } else if (Platform.isIOS) {
-                  return UiKitView(
+              if (Platform.isAndroid) {
+                return PlatformViewLink(
+                  viewType: _viewType,
+                  surfaceFactory: (final context, final controller) => AndroidViewSurface(
+                    controller: controller as AndroidViewController,
+                    gestureRecognizers: const {},
+                    hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+                  ),
+                  onCreatePlatformView: (final params) =>
+                      PlatformViewsService.initSurfaceAndroidView(
+                    id: params.id,
                     viewType: _viewType,
                     layoutDirection: TextDirection.ltr,
                     creationParams: creationParams,
                     creationParamsCodec: const StandardMessageCodec(),
-                    onPlatformViewCreated: _onPlatformViewCreated,
-                  );
-                }
-                return ColoredBox(
-                  color: const Color(0xffff00ff),
-                  child: Center(
-                    child: Text(
-                      'TODO — Implement ReadiumReaderWidget on ${Platform.operatingSystem}.',
-                    ),
-                  ),
+                  )
+                        ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
+                        ..addOnPlatformViewCreatedListener(_onPlatformViewCreated)
+                        ..create(),
                 );
-              },
-            ),
+              } else if (Platform.isIOS) {
+                return UiKitView(
+                  viewType: _viewType,
+                  layoutDirection: TextDirection.ltr,
+                  creationParams: creationParams,
+                  creationParamsCodec: const StandardMessageCodec(),
+                  onPlatformViewCreated: _onPlatformViewCreated,
+                );
+              }
+              return ColoredBox(
+                color: const Color(0xffff00ff),
+                child: Center(
+                  child: Text(
+                    'TODO — Implement ReadiumReaderWidget on ${Platform.operatingSystem}.',
+                  ),
+                ),
+              );
+            },
           );
         },
       );
@@ -319,8 +311,6 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
     await for (final properties in propertiesStream.skip(1)) {
       R2Log.d('Changed - $properties');
       try {
-        ReadiumReaderChannel.writeUserPropertiesFile(properties);
-
         await FlutterReadium.state.awaitReaderReady;
 
         _channel?.setUserProperties(properties);
@@ -372,12 +362,12 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
 
     R2Log.d('New widget is ${_channel?.name}!');
 
+    _observeLocatorOnPageChanged();
+
     _awaitLocatorIsVisible().then((final _) {
       FlutterReadium.updateState(
         readerStatus: ReadiumReaderStatus.open,
       );
-
-      _observeLocatorOnPageChanged();
       _observeReaderProperties();
       _observeAudioLocator();
     });
@@ -457,40 +447,27 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
     R2Log.d('Done');
   }
 
-  Future<void> _awaitNativeViewReady([int retry = 0]) async {
-    R2Log.d('attempt: $retry');
+  Future<void> _awaitNativeViewReady() async {
+    for (var attempt = 1; attempt <= _maxRetryAwaitNativeViewReady; attempt++) {
+      R2Log.d(() => '_awaitNativeViewReady attempt #$attempt');
 
-    if (retry >= _maxRetryAwaitNativeViewReady) {
-      R2Log.d('Max retry reached!');
+      final state = FlutterReadium.state;
 
-      return;
-    }
+      if (!state.hasPub) {
+        R2Log.d('Probably publication was closed while awaiting native view');
+        return;
+      }
 
-    final state = FlutterReadium.state;
+      if (await _channel?.isReaderReady() == true) {
+        // Native reader is ready -> complete the future.
+        return;
+      }
 
-    if (!state.hasPub) {
-      R2Log.d('Probebly publication is closed while awaiting for locator');
-
-      return;
-    }
-
-    final channel = _channel;
-
-    if (channel == null) {
-      R2Log.d('Channel not set - retry');
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      return _awaitNativeViewReady(++retry);
-    }
-
-    if (!await channel.isReaderReady()) {
+      // Fell through, delay before next attempt
       R2Log.d(() => 'Native reader not ready - retry');
-
       await Future.delayed(const Duration(milliseconds: 100));
-
-      return _awaitNativeViewReady(++retry);
     }
+    R2Log.w('_awaitNativeViewReady: Max retry reached!');
   }
 
   Future<void> _setLocation(final Locator locator, final bool isAudioBookWithText) async {
@@ -544,7 +521,7 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
     // Remember whether the spoken part is visible. If currently visible, track the spoken part as
     // it moves. If not visible, don't track it. If there is no spoken part, don't change whether
     // we're tracking it or not.
-    final locatorVisible = await _channel?.isLocatorVisible(locator);
+    final locatorVisible = await _channel?.isLocatorVisible(locator, true);
 
     FlutterReadium.updateState(
       audioMatchesText: FlutterReadium.state.readerReady && locatorVisible != false,
@@ -553,47 +530,34 @@ class _ReadiumReaderWidgetState extends State<ReadiumReaderWidget>
     R2Log.d('Update Done');
   }
 
-  Future<void> _awaitLocatorIsVisible([int retry = 0]) async {
-    R2Log.d('attempt: $retry');
+  Future<void> _awaitLocatorIsVisible() async {
+    for (var attempt = 1; attempt <= _maxRetryAwaitLocatorVisible; attempt++) {
+      R2Log.d(() => '_awaitLocatorIsVisible attempt #$attempt');
 
-    if (retry >= _maxRetryAwaitLocatorVisible) {
-      R2Log.d('Max retry reached!');
+      final state = FlutterReadium.state;
+      final locator = state.currentLocator;
+      final channel = _channel;
 
-      return;
-    }
+      if (!state.hasPub) {
+        R2Log.d('Probably publication was closed while awaiting for locator');
+        return;
+      }
 
-    final state = FlutterReadium.state;
-
-    if (!state.hasPub) {
-      R2Log.d('Probebly publication is closed while awaiting for locator');
-
-      return;
-    }
-
-    final locator = state.currentLocator;
-    final channel = _channel;
-
-    if (channel == null || locator == null) {
-      R2Log.d('Either Channel or locator not set - retry  channel: $_channel - $locator ');
-
-      await Future.delayed(const Duration(seconds: 1));
-
-      return _awaitLocatorIsVisible(++retry);
-    }
-
-    if (state.readerStatus.isLoading) {
-      await _awaitNativeViewReady();
-    }
-
-    if (!await channel.isLocatorVisible(locator)) {
-      R2Log.d('locator not visible - retry $locator');
-
-      channel.go(locator, isAudioBookWithText: state.isAudiobookWithText);
-
+      if (channel == null || locator == null) {
+        R2Log.d('Channel or locator not set. channel=$_channel,locator=$locator');
+      } else if (state.readerStatus.isLoading) {
+        await _awaitNativeViewReady();
+      } else if (await channel.isLocatorVisible(locator, false)) {
+        // Locator is now visible -> complete the future.
+        return;
+      } else {
+        R2Log.d(() => 'Locator not visible - retry with go to locator: $locator');
+        await channel.go(locator, isAudioBookWithText: state.isAudiobookWithText);
+      }
+      // Fell through, delay before next attempt
       await Future.delayed(const Duration(milliseconds: 100));
-
-      return _awaitLocatorIsVisible(++retry);
     }
+    R2Log.w('_awaitLocatorIsVisible: Max retry reached!');
   }
 
   Future<void> _observeLocatorOnPageChanged() async {

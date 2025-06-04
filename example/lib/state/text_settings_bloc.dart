@@ -103,6 +103,7 @@ class TextSettingsBloc extends Bloc<TextSettingsEvent, TextSettingsState> {
     });
 
     on<OpenPubSuccess>((final event, final emit) {
+      // ignore: unused_result
       FlutterReadium.updateState(
         readerProperties: ReadiumReaderProperties(
           fontSize: state.fontSize,

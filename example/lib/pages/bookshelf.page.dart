@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_readium/download/_index.dart';
 
@@ -13,7 +15,7 @@ class BookshelfPage extends StatefulWidget {
   const BookshelfPage({super.key});
 
   @override
-  _BookshelfPageState createState() => _BookshelfPageState();
+  State<BookshelfPage> createState() => _BookshelfPageState();
 }
 
 class _BookshelfPageState extends State<BookshelfPage> {
@@ -24,13 +26,15 @@ class _BookshelfPageState extends State<BookshelfPage> {
   final List<String> _identifiersFromAsset = ['dk-nota-714304'];
 
   // TODO: find a better solution for initialLocator.
+  // make sure it is a valid locator for the publication being opened
+  // minimum href and position should be set
   final initialLocator = Locator(
-    href: '/OPS/main2.xml',
+    href: '005-chapter.xhtml',
     title: 'Test',
-    // locations: Locations(cssSelector: '#chapter_245810 > div > p:nth-child(19)'),
     locations: Locations(
+      cssSelector: null,
       progression: 0.38461538461538464,
-      position: 26,
+      position: 5,
       totalProgression: 0.176056338028169,
     ),
     type: 'text/html',
@@ -44,9 +48,19 @@ class _BookshelfPageState extends State<BookshelfPage> {
 
   Future<void> _initialize() async {
     // should only be done first time app is started. how to do that?
-    await PublicationUtils.moveReadiumPublicationsToDocuments();
+    List<OPDSPublication> pubs;
 
-    final pubs = await PublicationUtils.loadPublications();
+    if (RuntimePlatform.isWeb) {
+      final String response = await rootBundle.loadString('assets/opdsList.json');
+      final List<dynamic> jsonData = json.decode(response);
+      final List<OPDSPublication> webOpdsPubs =
+          jsonData.map((data) => OPDSPublication.fromJson(data)).toList();
+
+      pubs = webOpdsPubs;
+    } else {
+      await PublicationUtils.moveReadiumPublicationsToDocuments();
+      pubs = await PublicationUtils.loadPublications();
+    }
 
     setState(() {
       _opdsPubs = pubs;
@@ -125,7 +139,7 @@ class _BookshelfPageState extends State<BookshelfPage> {
             try {
               context
                   .read<PublicationBloc>()
-                  .add(OpenPublication(opdsPub: pub, initialLocator: initialLocator));
+                  .add(OpenPublication(opdsPub: pub, initialLocator: null));
               Navigator.pushNamed(context, '/player');
             } on Object catch (e) {
               _toast('Error opening publication: $e');
@@ -141,9 +155,10 @@ class _BookshelfPageState extends State<BookshelfPage> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(pub.metadata.identifier ?? "(unknown)"),
                       Text(
                         pub.metadata.title[pub.metadata.language?.first] ??
-                            'Missing language or title',
+                            pub.metadata.title.values.first,
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                       ),
                       Text(_listAuthors(pub)),
@@ -172,6 +187,7 @@ class _BookshelfPageState extends State<BookshelfPage> {
         ),
       );
 
+  // TODO: make sideloading work on web
   Widget _buildAddBookCard(final BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(8.0, 4.0, 8.0, 4.0),
         child: InkWell(
