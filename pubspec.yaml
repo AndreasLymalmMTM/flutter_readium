@@ -65,4 +65,3 @@ flutter:
         package: dk.nota.flutter_readium
         pluginClass: R2NavigatorFlutterPlugin
   assets:
-    - assets/helpers/
