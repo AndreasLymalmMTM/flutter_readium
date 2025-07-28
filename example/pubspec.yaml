@@ -16,7 +16,7 @@ dependencies:
   archive:
   audio_service:
     git:
-      url: git@github.com:Notalib/audio_service.git
+      url: https://github.com/Notalib/audio_service.git
       ref: lyt
       path: audio_service
   cupertino_icons: ^1.0.2

@@ -16,7 +16,7 @@ dependencies:
 
   audio_service:
     git:
-      url: git@github.com:Notalib/audio_service.git
+      url: https://github.com/Notalib/audio_service.git
       ref: lyt
       path: audio_service
   audio_session:
@@ -31,7 +31,7 @@ dependencies:
   json_diff:
   just_audio:
     git:
-      url: git@github.com:notalib/just_audio.git
+      url: https://github.com/AndreasLymalmMTM/just_audio.git
       ref: lyt4
       path: just_audio
   path: ^1.9.0
