@@ -20,6 +20,9 @@ import org.readium.r2.shared.util.asset.Asset
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.fromEpubHref
 import org.readium.r2.shared.util.getOrElse
+import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpRequest
+import org.readium.r2.shared.util.http.HttpTry
 import org.readium.r2.shared.util.mediatype.MediaType
 import org.readium.r2.shared.util.resource.Resource
 import org.readium.r2.shared.util.resource.TransformingContainer
@@ -135,11 +138,24 @@ internal class PublicationMethodCallHandler(private val context: Context) :
             Log.e(TAG, "fromLink: Invalid href URL")
             return@launch
           }
-          val asset =
-            readium!!.assetRetriever.retrieve(url)
+          val httpClient =  DefaultHttpClient(
+            callback = object : DefaultHttpClient.Callback {
+              override suspend fun onStartRequest(request: HttpRequest): HttpTry<HttpRequest> {
+                return Try.success(
+                  request.copy {
+                    headers.forEach { (key, value) ->
+                      setHeader(key, value)
+                    }
+                  }
+                )
+              }
+            }
+          )
+          val asset = AssetRetriever(readium!!.contentResolver, httpClient)
+              .retrieve(url)
               .getOrElse { error: AssetRetriever.RetrieveUrlError ->
                 Log.e(TAG, "Error retrieving asset: $error")
-                result.error("AssetRetrievalError", error.message, error.cause)
+                result.error("AssetRetrievalError", error.message?.toString(), error.cause?.toString())
                 return@getOrElse null
               }
           if (asset != null) {

@@ -35,6 +35,8 @@ private const val TAG = "ReadiumHelper"
  */
 class Readium(context: Context) {
 
+  val contentResolver = context.contentResolver;
+
   val httpClient =
     DefaultHttpClient()
 
