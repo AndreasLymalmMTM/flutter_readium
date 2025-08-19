@@ -21,6 +21,8 @@ import org.readium.r2.shared.util.Url
 //import org.readium.r2.shared.util.Try
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpRequest
+import org.readium.r2.shared.util.http.HttpTry
 import org.readium.r2.shared.util.resource.Resource
 import org.readium.r2.shared.util.resource.TransformingContainer
 import org.readium.r2.shared.util.resource.TransformingResource
@@ -35,13 +37,39 @@ private const val TAG = "ReadiumHelper"
  */
 class Readium(context: Context) {
 
-  val contentResolver = context.contentResolver;
+  val currentContext = context;
 
-  val httpClient =
+  var httpClient =
     DefaultHttpClient()
 
-  val assetRetriever =
-    AssetRetriever(context.contentResolver, httpClient)
+  var assetRetriever =
+    AssetRetriever(currentContext.contentResolver, httpClient)
+
+  fun setHttpClient(headers: Map<String, String>) {
+    httpClient = DefaultHttpClient(
+      callback = object : DefaultHttpClient.Callback {
+        override suspend fun onStartRequest(request: HttpRequest): HttpTry<HttpRequest> {
+          val requestWithHeaders = request.copy {
+            headers.forEach { (key, value) ->
+              setHeader(key, value)
+            }
+          }
+          return Try.success(requestWithHeaders)
+        }
+      }
+    )
+    assetRetriever = AssetRetriever(currentContext.contentResolver, httpClient)
+    publicationOpener = PublicationOpener(
+      publicationParser = DefaultPublicationParser(
+        currentContext,
+        assetRetriever = assetRetriever,
+        httpClient = httpClient,
+        // Only required if you want to support PDF files using the PDFium adapter.
+        pdfFactory = null, //PdfiumDocumentFactory(context)
+      ),
+      contentProtections = contentProtections,
+    )
+  }
 
   /**
    * The LCP service decrypts LCP-protected publication and acquire publications from a
@@ -63,7 +91,7 @@ class Readium(context: Context) {
   /**
    * The PublicationFactory is used to open publications.
    */
-  val publicationOpener = PublicationOpener(
+  var publicationOpener = PublicationOpener(
     publicationParser = DefaultPublicationParser(
       context,
       assetRetriever = assetRetriever,
